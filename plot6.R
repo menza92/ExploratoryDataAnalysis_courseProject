@@ -45,16 +45,35 @@ png(filename="plot6.png",width=480,height=480,units="px")
 
 # Plotting two side by side line plots.
 par(mfrow=c(1, 2), mar=c(4, 4, 1, 1))
-
-qplot(year,Total_Emissions,data=dat,color=location,geom="line",
-      main="Motor-Vehicle PM2.5 Emissions by Year",
-      xlab="Year",ylab="Emissions (tonnes)")
-
-qplot(year,logEmissions,data=dat,color=location,geom="line",
-      main="Motor-Vehicle PM2.5 Emissions by Year (log10)",
-      xlab="Year",ylab="log_10( Emissions )")
+# Linear plot
+with( dat[location=="Baltimore",],
+      plot( year,Total_Emissions,col="blue",type="b",
+            main="Motor-Vehicle Emissions",
+            xlab="Year", ylab="Emissions (tonnes)",
+            ylim = c( 50, max(dat$Total_Emissions)+100 ) )
+)
+with( dat[location=="LA",],
+      points( year,Total_Emissions,col="purple",type="b")
+)
+# Log10 plot
+with( dat[location=="Baltimore",],
+      plot( year,logEmissions,col="blue",type="b",
+            main="Motor-Vehicle Emissions (log10)",
+            xlab="Year", ylab="log_10( Emissions )",
+            ylim = c( 1.75, max(dat$logEmissions)+0.1 ))
+)
+with( dat[location=="LA",],
+      points( year,logEmissions,col="purple",type="b")
+)
+# Legend
+legend("bottomleft",
+       c("Balt.","L.A."),
+       lty=c(1,1),
+       col=c("blue","purple")
+)
 
 dev.off()
+
 
 # So the L.A. has a massive volume of emission at 1999 which increases
 # consistently until 2005, where it begins to decrease. Overall, the emission
