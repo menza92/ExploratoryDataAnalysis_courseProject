@@ -1,0 +1,214 @@
+---
+title: "Fine particulate matter pollution in U.S."
+author: "A. C. Dennerley"
+date: "January 28, 2016"
+output: 
+  html_document:
+    keep_md: true
+---
+
+Fine particulate matter (PM2.5) is an ambient air pollutant for which there is strong evidence that it is harmful to human health. In the United States, the Environmental Protection Agency (EPA) is tasked with setting national ambient air quality standards for fine PM and for tracking the emissions of this pollutant into the atmosphere. Approximatly every 3 years, the EPA releases its database on emissions of PM2.5. This database is known as the National Emissions Inventory (NEI). More information about the NEI is available at the EPA National Emissions Inventory web site.  
+
+The data here is of pollution from 1999-2008.  This document details my methods in both processing this data and answering a few simple questions as part of the Coursera 'Getting and Cleaning Data' (Jan 2016 offering) project.
+
+```{r,echo=TRUE}
+if(!require(data.table)) installed.packages("data.table")
+if(!require(ggplot2)) installed.packages("ggplot2")
+if(!require(lattice)) installed.packages("lattice")
+```
+
+Start by forming a data frame.
+
+```{r,echo=TRUE,cache=TRUE}
+dat.main <- if(file.exists("summarySCC_PM25.rds")) {
+        readRDS("summarySCC_PM25.rds") } else {
+        readRDS(unzip("exdata_data_NEI_data.zip",files="summarySCC_PM25.rds")) }
+
+head(dat.main)
+```
+
+Next is a quick check for incomplete cases.
+
+```{r,echo=TRUE,cache=TRUE}
+sum(!complete.cases(dat.main[,1],dat.main[,2],dat.main[,3],dat.main[,4],dat.main[,5],dat.main[,6]))
+```
+
+Before continuing, switching to the data.table format will make subsetting and plotting much faster.
+
+```{r,echo=TRUE,cache=TRUE}
+dat.main <- data.table(dat.main)
+names(dat.main)
+```
+
+##Question 1
+Have total emissions from PM2.5 decreased in the United States from 1999 to 2008? Using the base plotting system, make a plot showing the total PM2.5 emission from all sources for each of the years 1999, 2002, 2005, and 2008.
+
+To accomplish this the built in tools of the data.table structure are amply sufficient to group entries by year and compute the sum of each group.  
+
+```{r, echo=TRUE}
+dat <- dat.main[,sum(Emissions),by=year]
+setnames(dat,c("year","V1"),c("year","Total_Emissions"))
+with(dat,plot(year,Total_Emissions,type="b",col="blue",
+              xlab="Year",ylab="Total Emissions (tonnes)",main="PM2.5 Emissions in the U.S. by Year"))
+```
+
+A consistant decrease in total emissions is observable here.
+
+##Question 2
+Have total emissions from PM2.5 decreased in the Baltimore City, Maryland (fips == "24510") from 1999 to 2008? Use the base plotting system to make a plot answering this question.
+
+This time, the table of sums by year is contructed from the subset of data corresponding to Baltimore.
+
+```{r,echo=TRUE}
+dat <- subset(dat.main,fips=="24510")[,sum(Emissions),by=year]
+setnames(dat,c("year","V1"),c("year","Total_Emissions"))
+
+with(dat,plot(year,Total_Emissions,type="b",col="blue",
+              xlab="Year",ylab="Emissions (tonnes)",main="PM2.5 Emissions in the Baltimore by Year"))
+```
+
+There is certainly more variation here, but the pollution is still decreasing overall.  
+
+##Question 3
+Of the four types of sources indicated by the type (point, nonpoint, onroad, nonroad) variable, which of these four sources have seen decreases in emissions from 1999–2008 for Baltimore City? Which have seen increases in emissions from 1999–2008? Use the ggplot2 plotting system to make a plot answer this question.
+
+Multiple subsets can get messy so generating a key from the year and type as a factor should be more readable.  
+
+```{r,echo=TRUE,cache=TRUE}
+dat.main[,key:= paste(year,type,sep="-")]
+dat <- subset(dat.main,fips=="24510")[,sum(Emissions),by=key]
+setnames(dat,c("key","V1"),c("key","Combined_Em"))
+```
+
+Moving from the key back to single variable factors is possible via look-up table.  
+
+```{r,echo=TRUE,cache=TRUE}
+keyTable <- data.table( expand.grid(unique(dat.main$year),unique(dat.main$type)) )
+setnames(keyTable,c("Var1","Var2"),c("year","type"))
+# Generating the key factor by which to match.
+keyTable[,keyhole:= paste(year,type,sep="-") ]
+setkey(keyTable,keyhole)
+```
+
+By setting a key in the lookup table, it's values can be referenced by row.  Now the descriptive columns of 'year' and 'type' are appended.
+
+```{r,echo=TRUE}
+dat[,year:= keyTable[key,year] ]
+dat[,type:= keyTable[key,type] ]
+```
+
+An overlay of the individual contributions of each type of measurment for emissions provides a great comparison by 'type' of source.
+
+```{r,echo=TRUE}
+qplot(year,Combined_Em,data=dat,color=type,geom="line",
+      main="PM2.5 Emissions in Baltimore by Year",
+      xlab="Year",ylab="Emissions (tonnes)")
+```
+
+Clearly nonpoint sources have contributed the largest fraction of the pollution historically.  The significant decrease in nonpoint source pollution appears to be the primary cause in the overall decrease.  Onroad and nonroad sources decreased somewhat consistently.  Point source emissions seem to be the only type to have a net increase over the years, as well as an increasing trend in general.
+
+##Question 4
+Across the United States, how have emissions from coal combustion-related sources changed from 1999–2008?
+
+The "SCC" variable holds a code to reference more detailed information on the sources in a second file.
+
+```{r,echo=TRUE,cache=TRUE}
+dat.ref <- if(file.exists("Source_Classification_Code.rds")) {
+        data.table(readRDS("Source_Classification_Code.rds")) } else {
+        data.table(
+          readRDS(
+            unzip("exdata_data_NEI_data.zip",files="Source_Classification_Code.rds")
+        ))}
+
+head(dat.ref)
+```
+The "EI.Sector" column will indicate whether a given "SCC" code indicates a coal combustion.  Using RegEx to track mention of coal in "EI.Sector" can be used to subset all cases of interest.
+```{r,echo=TRUE,cache=TRUE}
+# at least one white space or beginning of line
+# 'coal' with no case dependance
+# at least one white space or end of line
+isCoal <- grepl( "( +|^)[Cc][Oo][Aa][Ll]( +|$)", dat.ref$EI.Sector )
+
+# List of coal combustion source codes
+coalSCC <- dat.ref$SCC[ isCoal ]
+
+dat <- dat.main[ SCC %in% coalSCC ][,sum(Emissions),by=year]
+setnames(dat,c("year","V1"),c("year","Total_Emissions"))
+```
+Now plotted by year.
+```{r,echo=TRUE}
+with( dat,
+      plot(year,Total_Emissions,type="b",col="blue",
+           xlab="Year",ylab="Emissions (tonnes)",
+           main="Coal-related PM2.5 Emissions in the U.S. by Year")
+)
+```
+
+Emission by coal combustion-related sources had decreased considerably from `r dat[year==1999,Total_Emissions]` to `r dat[year==2008,Total_Emissions]` tonnes; a `r round( 100*( dat[year==1999,Total_Emissions] - dat[year==2008,Total_Emissions] ) / dat[year==1999,Total_Emissions], digits=2)`% drop.  `r round( 100*( dat[year==2005,Total_Emissions] - dat[year==2008,Total_Emissions] ) / ( dat[year==1999,Total_Emissions] - dat[year==2008,Total_Emissions] ), digits=2)`% of the change occured during 2005-2008.
+
+##Question 5
+
+How have emissions from motor vehicle sources changed from 1999–2008 in Baltimore City?
+
+```{r,echo=TRUE,cache=TRUE}
+# Mobile or mobile
+# a gap of any number of characters in any combination
+# Vehicle, Vehicles, vehicle, or vehicles
+isMotorVehicle <- grepl( "[Mm]obile .+ [Vv]ehicle([s]?)", dat.ref$EI.Sector )
+
+# List of relevant SCC numbers.
+mvSCC <- dat.ref$SCC[ isMotorVehicle ]
+
+# Sum total motor-vehicle emissions in baltimore by year.
+dat.mvBalt <- dat.main[fips=="24510" & SCC %in% mvSCC ][,sum(Emissions),by=year]
+setnames(dat.mvBalt,c("year","V1"),c("year","Total_Emissions"))
+```
+
+```{r,echo=TRUE}
+with( dat.mvBalt,
+      plot( year,Total_Emissions,type="b",col="blue",
+            xlab="Year",ylab="Emissions (tonnes)",
+            main="Motor-Vehicle PM2.5 Emissions in the Baltimore by Year")
+)
+```
+
+Motor-vehicle emissions in Baltimore have dropped `r round( 100*( dat[year==1999,Total_Emissions] - dat[year==2008,Total_Emissions] ) / dat[year==1999,Total_Emissions], digits=2)`% between 1999 and 2008.
+
+##Question 5
+
+Compare emissions from motor vehicle sources in Baltimore City with emissions from motor vehicle sources in Los Angeles County, California (fips == "06037"). Which city has seen greater changes over time in motor vehicle emissions?
+
+```{r,echo=TRUE}
+# Table for L.A. motor vehicle emissions.
+dat.mvLA <- dat.main[fips=="06037" & SCC %in% mvSCC ][,sum(Emissions),by=year]
+setnames(dat.mvLA,c("year","V1"),c("year","Total_Emissions"))
+
+dat.mvBalt[,location := "Baltimore"]
+dat.mvLA[,location := "LA"]
+
+dat <- rbind(dat.mvBalt,dat.mvLA)
+dat[, logEmissions := log10(Total_Emissions)]
+```
+
+```{r,echo=TRUE}
+par(mfrow=c(1, 2), mar=c(4, 4, 1, 1))
+
+qplot(year,Total_Emissions,data=dat,color=location,geom="line",
+      main="Motor-Vehicle PM2.5 Emissions by Year",
+      xlab="Year",ylab="Emissions (tonnes)")
+
+qplot(year,logEmissions,data=dat,color=location,geom="line",
+      main="Motor-Vehicle PM2.5 Emissions by Year (log10)",
+      xlab="Year",ylab="log_10( Emissions )")
+```
+
+So the L.A. has a massive volume of emission at 1999 which increases consistently until 2005, where it begins to decrease.  Overall, the emission in L.A. increased by `r dat.mvLA[year==2008,Total_Emissions] - dat.mvLA[year==1999,Total_Emissions]` tonnes (`r round( dat.mvLA[year==2008,Total_Emissions] / dat.mvLA[year==1999,Total_Emissions] * 100 - 100 , digits=2 )`%).  A base 10 log plot better shows the changes with respect to overall magnitude of the emission (ie decrease of 0.69 means emission is halved, increase of 0.69 means emission is doubled).  So while LA changes are much larger than Baltimore, Baltimore experiences a larger change percent-wise, finishing at `r round( dat.mvBalt[year==2008,Total_Emissions] / dat.mvBalt[year==1999,Total_Emissions] * 100 , digits=2 )`% of it's initial emissions relative to LA's finishing `r round( dat.mvLA[year==2008,Total_Emissions] / dat.mvLA[year==1999,Total_Emissions] * 100 , digits=2 )`%.
+
+
+
+
+
+
+
+
+
