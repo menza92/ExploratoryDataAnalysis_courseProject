@@ -119,8 +119,6 @@ dat.ref <- if(file.exists("Source_Classification_Code.rds")) {
           readRDS(
             unzip("exdata_data_NEI_data.zip",files="Source_Classification_Code.rds")
         ))}
-
-head(dat.ref)
 ```
 The "EI.Sector" column will indicate whether a given "SCC" code indicates a coal combustion.  Using RegEx to track mention of coal in "EI.Sector" can be used to subset all cases of interest.
 ```{r,echo=TRUE,cache=TRUE}
@@ -174,7 +172,7 @@ with( dat.mvBalt,
 
 Motor-vehicle emissions in Baltimore have dropped `r round( 100*( dat[year==1999,Total_Emissions] - dat[year==2008,Total_Emissions] ) / dat[year==1999,Total_Emissions], digits=2)`% between 1999 and 2008.
 
-##Question 5
+##Question 6
 
 Compare emissions from motor vehicle sources in Baltimore City with emissions from motor vehicle sources in Los Angeles County, California (fips == "06037"). Which city has seen greater changes over time in motor vehicle emissions?
 

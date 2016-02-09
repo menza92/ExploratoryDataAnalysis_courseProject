@@ -282,7 +282,7 @@ with( dat.mvBalt,
 
 Motor-vehicle emissions in Baltimore have dropped 39.97% between 1999 and 2008.
 
-##Question 5
+##Question 6
 
 Compare emissions from motor vehicle sources in Baltimore City with emissions from motor vehicle sources in Los Angeles County, California (fips == "06037"). Which city has seen greater changes over time in motor vehicle emissions?
 
@@ -318,7 +318,7 @@ qplot(year,logEmissions,data=dat,color=location,geom="line",
 
 ![](methodOfProcessing_files/figure-html/unnamed-chunk-17-2.png)
 
-So the L.A. has a massive volume of emission at 1999 which increases consistently until 2005, where it begins to decrease.  Overall, the emission in L.A. increased by 170.201 tonnes (4.33%).  A base 10 log plot better shows the changes with respect to overall magnitude of the emission (ie decrease of 0.69 means emission is halved, increase of 0.69 means emission is doubled).  So while LA changes are much larger than Baltimore, Baltimore experiences a larger change percent-wise, finishing at 25.45% of it's initial emissions relative to LA's finishing 104.33%
+So the L.A. has a massive volume of emission at 1999 which increases consistently until 2005, where it begins to decrease.  Overall, the emission in L.A. increased by 170.201 tonnes (4.33%).  A base 10 log plot better shows the changes with respect to overall magnitude of the emission (ie decrease of 0.69 means emission is halved, increase of 0.69 means emission is doubled).  So while LA changes are much larger than Baltimore, Baltimore experiences a larger change percent-wise, finishing at 25.45% of it's initial emissions relative to LA's finishing 104.33%.
 
 
 
